@@ -10,7 +10,7 @@ The code developed by Martin Veresko and Ming-Cheng Cheng uses the QEM-Galerkin 
 
 
 ## Instructions
-Firstly, read the Input.txt file. This file contains details of what every imput signifies. Once you have changed the inputs to your liking you can run the training and verification stages all together with the script RunAll.m. If all is correct your QEM LSE plot should look like Fig. 2. 
+Firstly, add the src directory to your matlab path. This contains all scripts for the runners in the main directory. Then read the Input.txt file. This file contains details of what every imput signifies. Once you have changed the inputs to your liking you can run the training and verification stages all together with the script RunAll.m. If all is correct your QEM LSE plot should look like Fig. 2. 
 
 <figure>
   
