@@ -1,5 +1,5 @@
 # QEM-PN: Quantum Element Method for Periodic Nanostructures
-The Quantum Element Method (QEM), first conceived by Ming-Cheng Cheng in [1], combines  reduced order modeling techniques — such as Proper Orthogonal Decomposition and Galerkin Projection — with domain decomposition and generic elements to form an effective simulation methodology for quantum nanostructures. This code, which accompanies [3], demonstrates the effectiveness of QEM for periodic structures by computing the wavefunctions and energy levels of nanostructures like those shown in Fig. 1. For details on the methodology of the QEM check out the papers below.
+The Quantum Element Method (QEM), first conceived by Ming-Cheng Cheng in [1], combines  reduced order modeling techniques — such as Proper Orthogonal Decomposition and Galerkin Projection — with domain decomposition and generic elements to form an effective simulation methodology for quantum nanostructures. This code, which accompanies [3], demonstrates the effectiveness of QEM for periodic structures by computing the wavefunctions and energy levels of nanostructures like those shown in Fig. 1. For details on the methodology of the QEM, check out the papers below in References.
 <div align="center">
 <figure>
   <p align="center">
