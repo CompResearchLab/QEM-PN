@@ -1,2 +1,0 @@
-DNSCOMPARE;
-QEMrunner;
