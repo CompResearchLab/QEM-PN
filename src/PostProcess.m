@@ -1,0 +1,580 @@
+classdef PostProcess <handle
+    %UNTITLED2 Summary of this class goes here
+    %   Detailed explanation goes here
+    
+    properties
+        DataM
+        times
+        NumModesS
+    end
+    
+    methods
+        function obj = PostProcess(DataM)
+            obj.DataM=DataM;
+           
+           
+        end
+
+        function []=PlotStates(obj,PlotStates,UsedModes,CStates,MSize,N_Rmin,N_Rmax,N_Rn,N_RTest,savefigsI,contours, ...
+                HTest,HMin,HMax,N_rH,MaxDrop,MinDrop,PlotScale,LSEM,Drop,PM,NFM,PS,nB,UMU,DoM,cutoffa)
+            global NFML
+            % we will not tie everything together
+            % generate profiles first
+            dA=(obj.DataM.Tx(2)-obj.DataM.Tx(1))*(obj.DataM.Ty(2)-obj.DataM.Ty(1));
+            WFPOD=zeros(size(obj.DataM.TX,1),size(obj.DataM.TX,2));
+            Incre=1;
+            Linestyle= {'r-','b:','g--','M-.'};
+            Linesize=[2,2,1.5,2];
+            for s=PlotStates
+                [~,I]=max(obj.DataM.DNSWF(:,:,s).^2,[],"all"); % get maximum index
+                [Mi,Mj]=ind2sub([length(obj.DataM.Ty),length(obj.DataM.Tx)],I); % get index of maximum
+               Profplot=figure;
+                %Scale DNS acording to scaling factor
+                WaveStateDNS=normalize(obj.DataM.DNSWF(:,:,s),dA/(1E-9)^2)*obj.DataM.DNSWF(:,:,s);
+                %-----------------------Plot Potential and DNS for x Subplot----------%
+                subplot(1,2,1);
+                hold on;
+                plot(obj.DataM.Tx/(10^(-9)),obj.DataM.TU(Mi,:),'k','LineWidth',1.5,'HandleVisibility','off');
+                plot(obj.DataM.Tx/(10^(-9)),WaveStateDNS(Mi,:).^2+obj.DataM.DNSEE(s),'k-','LineWidth',3,'DisplayName','DNS');
+                
+                xlabel('X Position (nm)','FontSize',12);
+                ylabel('Energy (eV)','FontSize',12);
+                box on
+                %----------------------Plot Potential and DNS for y Subplot-----------%
+                subplot(1,2,2);
+                hold on;
+                %plot potential and DNS
+                plot(obj.DataM.Ty/10^(-9),obj.DataM.TU(:,Mj),'k','LineWidth',1.5,'HandleVisibility','off');
+                plot(obj.DataM.Ty/(10^(-9)),WaveStateDNS(:,Mj).^2+obj.DataM.DNSEE(s),'k-','LineWidth',3,'DisplayName',"DNS");
+                xlabel('Y Position (nm)','FontSize',12);
+                ylabel('Energy (eV)','FontSize',12);
+                
+                box on
+                UM=UsedModes(Incre,:); % get the used modes for the current state
+                MI=1;
+                for m=UM
+                    if(m==0)
+                        continue;
+                    end
+                    [~,WFPOD]=obj.assemble(m,s);
+                    WavePOD=normalize(WFPOD,dA/(1E-9)^2)*WFPOD;
+                   
+             
+                    %--------------------Add POD Plot to x subplot----------------%
+                    subplot(1,2,1);
+                    ax=gca;
+                    
+                    hold on
+                    %plot POD wave function
+                    plot(obj.DataM.Tx/(10^(-9)),WavePOD(Mi,:).^2+obj.DataM.DNSEE(s),Linestyle{MI},'DisplayName',strcat("POD: ",string(m)),'LineWidth',Linesize(MI));
+                    
+                    Depth=max(obj.DataM.TU(:,:),[],"all");
+                    axis([obj.DataM.Tx(1)/(10^(-9)),obj.DataM.Tx(end)/(10^(-9)),0,Depth*(1+PlotScale)])
+                    l=legend("FontSize",15,"numColumns",2);
+                    sgtitle("State: "+string(s))
+                    pbaspect(ax,[0.7598257575.*.7,1.*.3,0.7598257575]);
+                    set(gca, 'FontSize', 15)
+                    %----------------------Add POD PLot to y subplot--------------%
+                    subplot(1,2,2);
+                    ax=gca
+                    hold on;
+                    plot(obj.DataM.Ty/(10^(-9)),WavePOD(:,Mj).^2+obj.DataM.DNSEE(s),Linestyle{MI},'DisplayName',strcat("POD: ",string(m)),"LineWidth",Linesize(MI));
+                    
+                    Depth=max(obj.DataM.TU(:,:),[],"all");
+                    axis([obj.DataM.Ty(1)/(10^(-9)),obj.DataM.Ty(end)/(10^(-9)),0,Depth*(1+PlotScale)])
+                    l=legend("FontSize",15,"numColumns",2);
+                    sgtitle("State: "+string(s));
+                    pbaspect(ax,[0.7598257575.*.7,1.*.3,0.7598257575]);
+                    set(gca, 'FontSize', 15)
+                    MI=MI+1;
+                end
+                
+                if(savefigsI==true)
+                    savefig(Profplot,"./Results/Profile_"+s)
+                end
+                    if(contours==true)
+                        ctfigure=figure;
+                        subplot(2,1,1);
+                        contourf(obj.DataM.TX,obj.DataM.TY,obj.DataM.DNSWF(:,:,s).^2);
+                        xline(obj.DataM.TX(Mi,Mj),'k','linewidth',3);
+                        yline(obj.DataM.TY(Mi,Mj),'k','linewidth',3);
+                        axis('equal')
+                        subplot(2,1,2)
+                        xline(obj.DataM.TX(Mi,Mj),'k','linewidth',3);
+                        yline(obj.DataM.TY(Mi,Mj),'k','linewidth',3);
+                        contourf(obj.DataM.TX,obj.DataM.TY,WavePOD.^2)
+                        axis('equal')
+                        sgtitle("State: "+string(s))
+                        if(savefigsI==true)
+                            savefig("./Results/Contour_"+s)
+                        end
+                    end
+                    Incre=Incre+1;
+               
+                
+            end
+            energydotfig=figure; % create a new figure
+            plot(0,obj.DataM.DNSEE,'bo');
+            hold on
+            plot(0,obj.DataM.EEPOD,'ro')
+            xlabel("K point")
+            ylabel("Energy eV")
+            savefig("./Results/Energy_plot")
+            e=figure;
+            yyaxis left
+            plot(abs(obj.DataM.EEPOD-obj.DataM.DNSEE),"LineWidth",2)
+            ylabel("Error_e_n (eV)","Interpreter","tex")
+            xlabel("Quantum State")
+            yyaxis right
+            plot(100*abs(obj.DataM.EEPOD-obj.DataM.DNSEE)./obj.DataM.DNSEE,"Linewidth",2)
+            ylabel("Error (%)")
+            hold off;
+            savefig(e,"./Results/EnergyErrorPlot")
+            % plot energy difference
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % Now we are going to generate LSError
+            WaveFunctionerror=zeros(CStates,LSEM);%Stores Error per mode
+
+            %-------------------For each # of Modes create POD WF and find LS error---%
+            obj.times=zeros(LSEM,1);
+            obj.NumModesS=zeros(CStates,LSEM);
+            
+            for s=1:CStates
+                [~,I]=max(abs(obj.DataM.DNSWF(:,:,s)),[],"all"); % get maximum index
+                [Mi,Mj]=ind2sub([length(obj.DataM.Ty),length(obj.DataM.Tx)],I); % get index of maximum
+                if(obj.DataM.DNSWF(Mi,Mj,s)<0)
+                    obj.DataM.DNSWF(:,:,s)=obj.DataM.DNSWF(:,:,s).*-1;
+                end
+                for m=1:1:LSEM
+                     tic
+                     [NumModes,WFPOD]=obj.assemble(m,s);
+                     obj.NumModesS(s,m)=NumModes;
+                     WavePOD=normalize(WFPOD,dA)*WFPOD;
+                     newtime=toc
+                     obj.times(m)=obj.times(m)+newtime;
+                     if(WavePOD(Mi,Mj)<0)
+                         WavePOD=WavePOD.*-1;
+                     end
+                    IntP=(WavePOD-obj.DataM.DNSWF(:,:,s)).^2;
+                    POSSUM=Int2D(IntP,dA);
+                    
+                    WaveFunctionerror(s,m)=sqrt(POSSUM);
+                end
+        end
+
+
+       
+        %------------------------------Create LS Error Plot-----------------------%
+        LSEPH=figure;
+        hold on
+        %Plot LS error for each state
+        for k=1:CStates
+         semilogy(1:1:LSEM,WaveFunctionerror(k,:)*100,'-s','LineWidth',1.5);
+         legendInfo{k} = strcat("State: ",string(k));
+         
+        end
+       
+        
+       
+        %NumModesT=table(NumModesAllS)
+        %writetable(NumModesT,"./Results/NumModesT")
+        %plot theoretical lambda
+        set(gcf,'color','w')
+        ylabel("LSE (%)")
+        xlabel("Max Number of Modes Per Block")
+        ax = gca;
+        box on;
+        ax.YAxis.Scale = 'log';
+        axis([-inf,inf,4*10^(-2),200])
+        set(ax,'FontSize',12);
+        legend(legendInfo,"NumColumns",2);
+        savefig(LSEPH,"./Results/LSE")
+
+        disp("Post process times are: (s)")
+        disp(obj.times)
+        NumModesAllS=zeros(LSEM,1);
+        for m=1:LSEM
+                NumModesAllS(m)=sum(obj.NumModesS(:,m));
+        end
+        NMPH=figure;
+        plot(1:LSEM, NumModesAllS,'b-s',"LineWidth",3);
+        for i=1:LSEM
+            text(i,NumModesAllS(i)+5,string(NumModesAllS(i)),"LineWidth",2,"Color","r","FontSize",20);
+        end
+        axis([1,LSEM+1,min(NumModesAllS),max(NumModesAllS)+20])
+        ax=gca;
+        set(ax,'FontSize',14)
+        xlabel("Max Number of Modes Per Block","FontSize",16)
+        ylabel("Total Number of Modes for all States","FontSize",16)
+        set(gca, 'FontSize', 15)
+        savefig(NMPH,"./Results/LSEModes")
+       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+       if(N_RTest==true)
+            N_r=logspace(N_Rmin,N_Rmax,N_Rn);
+            N_rError=zeros(1,N_Rn); %average error at last state for N_r
+            for NI=1:length(N_r)
+                
+            obj.DataM.Solve(MSize,N_r(NI),CStates,Drop,NFM,PM,DoM,UMU,cutoffa);
+            for s=1:CStates
+                [~,I]=max(abs(obj.DataM.DNSWF(:,:,s)),[],"all"); % get maximum index
+                [Mi,Mj]=ind2sub([length(obj.DataM.Ty),length(obj.DataM.Tx)],I); % get index of maximum
+                 m=MSize;
+                 [~,WFPOD]=obj.assemble(m,s);
+                 WavePOD=normalize(WFPOD,dA)*WFPOD;
+                if(WavePOD(Mi,Mj)<0)
+                    WavePOD=WavePOD.*-1;
+                end
+                IntP=(WavePOD-obj.DataM.DNSWF(:,:,s)).^2;
+                POSSUM=Int2D(IntP,dA);
+                
+                N_rError(NI)=N_rError(NI)+sqrt(POSSUM);
+            end
+            N_rError(NI)=N_rError(NI)/CStates;
+            end
+            NerrorFig=figure;
+            loglog(N_r,N_rError*100,'k-','linewidth',2);
+            set(gca,['Xscale'],'log');
+            xlabel("N_r")
+            ylabel("Average Error using "+ string(MSize)+" Modes")
+            savefig("./Results/N_r_test")
+       end    
+        obj.DataM.AssembleTimes=obj.times;
+        fileID = fopen('./Results/Times.txt','w');
+        fprintf(fileID,"DNSTime is: %f\n",obj.DataM.DNSTIME);
+        fprintf(fileID,'POD generate H time is : %f\n',obj.DataM.HamGTime);
+        fprintf(fileID,' POD Solve time is is : %f\n', obj.DataM.HamSTime);
+        for i=1:length(obj.times)
+            fprintf(fileID,' Assembly time for %d modes: %f',i,obj.times(i));
+            fprintf(fileID,': Total Time quicker : %f\n',obj.DataM.DNSTIME/(obj.DataM.HamGTime+obj.DataM.HamSTime+obj.times(i)));
+        end
+        fclose(fileID); 
+        % preform the H test
+        if(HTest==true)
+            HSizes=HMin:1:HMax;
+            WaveFunctionerrorH=zeros(1,length(HSizes));
+           for h=1:length(HSizes)
+               obj.DataM.Solve(HSizes(h),N_rH,CStates,Drop,NFM,PM,DoM,UMU,cutoffa);
+               for s=1:CStates
+                        [~,I]=max(abs(obj.DataM.DNSWF(:,:,s)),[],"all"); % get maximum index
+                        [Mi,Mj]=ind2sub([length(obj.DataM.Ty),length(obj.DataM.Tx)],I); % get index of maximum
+                        if(obj.DataM.DNSWF(Mi,Mj,s)<0)
+                            obj.DataM.DNSWF(:,:,s)=obj.DataM.DNSWF(:,:,s).*-1;
+                        end
+                         [~,WFPOD]=obj.assemble(MSize,s);
+                         WavePOD=normalize(WFPOD,dA)*WFPOD;
+                         if(WavePOD(Mi,Mj)<0)
+                             WavePOD=WavePOD.*-1;
+                         end
+                        IntP=(WavePOD-obj.DataM.DNSWF(:,:,s)).^2;
+                        POSSUM=Int2D(IntP,dA);   
+                        WaveFunctionerrorH(s,h)=sqrt(POSSUM);
+               end
+           end
+            ht=figure;
+            HError=sum(WaveFunctionerrorH,1)/CStates;
+            plot(HSizes,HError*100,'LineWidth',2);
+            xlabel("HSize")
+            ylabel("Average Error");
+            savefig("./Results/H_test")
+            
+        end
+ if(DoM=='D')
+        if(PM=="Classical")
+            LSEU=zeros(length(MinDrop:MaxDrop),1);
+            LSEUM=zeros(length(MinDrop:MaxDrop),1);
+            NM=zeros(length(MinDrop:MaxDrop),1);
+            SingleBlockNM=zeros(length(MinDrop:MaxDrop),1);
+            CompTime=zeros(length(MinDrop:MaxDrop),1);
+            TotalTime=zeros(length(MinDrop:MaxDrop),1);
+            CNTER=1;
+            for i=MinDrop:MaxDrop
+                [LSEU(CNTER),NM(CNTER),SingleBlockNM(CNTER),CompTime(CNTER),TotalTime(CNTER),LSEUM(CNTER)]=obj.DataM.compLSEU(10^(-i),0,PM,MSize,nB,DoM,UMU);
+                CNTER=CNTER+1;
+           
+            end
+            LSEP=figure
+            semilogy(MinDrop:MaxDrop,LSEU*100,"b-s","LineWidth",2);
+            CNTER=1;
+            for i=MinDrop:MaxDrop
+                text(i,LSEU(CNTER)*2*100,string(NM(i)),"FontSize",12,"Color","r")
+                text(i,LSEU(CNTER)*3*100,string(SingleBlockNM(i)),"FontSize",12,"Color","b")
+                text(i,LSEU(CNTER)*4*100,string(sprintf('%.3e ',CompTime(i)))+"s","FontSize",12,"Color","b")
+                text(i,LSEU(CNTER)*6*100,string(sprintf('%.3e ',TotalTime(i)))+"s","FontSize",12,"Color","r")
+                CNTER=CNTER+1;
+            end
+            ax=gca;
+            axis([MinDrop,MaxDrop+1,min(LSEU*100/2),max(LSEU*100*4)]);
+            xlabel("Eigenvalue Order Drop","FontSize",12);
+            ylabel("LSE (%) for Potential");
+            savefig(LSEP,"./Results/LSEPotential");
+            LSEMl=figure
+            semilogy(MinDrop:MaxDrop,LSEUM*100,"b-s","LineWidth",2);
+            axis([MinDrop,MaxDrop+1,min(LSEUM*100/2),max(LSEUM*100*4)]);
+            xlabel("Eigenvalue Order Drop","FontSize",12);
+            ylabel("LSE Middle (%) for Potential");
+            savefig(LSEMl,"./Results/LSEPotentialM");
+        elseif(PM=="Fourier")
+            LSEU=zeros(length(1:NFML),1);
+            LSEUM=zeros(length(1:NFML),1);
+            NM=zeros(length(1:NFML),1);
+            SingleBlockNM=zeros(length(1:NFML),1);
+            CompTime=zeros(length(1:NFML),1);
+            TotalTime=zeros(length(1:NFML),1);
+            CNTER=1;
+            for i=1:NFML
+                [LSEU(CNTER),NM(CNTER),SingleBlockNM(CNTER),CompTime(CNTER),TotalTime(CNTER),LSEUM(CNTER)]=obj.DataM.compLSEU(0,i,PM,MSize,nB,DoM,UMU);
+                CNTER=CNTER+1;
+           
+            end
+            LSEP=figure
+            semilogy(1:NFML,LSEU*100,"b-s","LineWidth",2);
+            CNTER=1;
+            for i=1:NFML
+                text(i,LSEU(CNTER)*2*100,string(NM(i)),"FontSize",12,"Color","r")
+                text(i,LSEU(CNTER)*3*100,string(SingleBlockNM(i)),"FontSize",12,"Color","b")
+                text(i,LSEU(CNTER)*4*100,string(sprintf('%.4e ',CompTime(i)))+"s","FontSize",12,"Color","b")
+                text(i,LSEU(CNTER)*6*100,string(sprintf('%.3e ',TotalTime(i)))+"s","FontSize",12,"Color","r")
+                CNTER=CNTER+1;
+            end
+            axis([1,NFML+1,min(LSEU*100/2),max(LSEU*100*4)]);
+            xlabel("NFM used","FontSize",12);
+            ylabel("LSE (%) for Potential");
+            savefig(LSEP,"./Results/LSEPotential");
+            LSEMl=figure
+            semilogy(1:NFML,LSEUM*100,"b-s","LineWidth",2);
+            axis([1,NFML+1,min(LSEUM*100/2),max(LSEUM*100*4)]);
+            xlabel("NFM used","FontSize",12);
+            ylabel("LSE Middle (%) for Potential");
+            savefig(LSEMl,"./Results/LSEPotentialM");
+        elseif(PM=="PSinv")
+            LSEU=zeros(length(MinDrop:MaxDrop),1);
+            LSEUM=zeros(length(MinDrop:MaxDrop),1);
+            NM=zeros(length(MinDrop:MaxDrop),1);
+            SingleBlockNM=zeros(length(MinDrop:MaxDrop),1);
+            CompTime=zeros(length(MinDrop:MaxDrop),1);
+            TotalTime=zeros(length(MinDrop:MaxDrop),1);
+            CNTER=1;
+            for i=MinDrop:MaxDrop
+                [LSEU(CNTER),NM(CNTER),SingleBlockNM(CNTER),CompTime(CNTER),TotalTime(CNTER),LSEUM(CNTER)]=obj.DataM.compLSEU(10^(-i),0,PM,MSize,nB,DoM,UMU);
+                CNTER=CNTER+1;
+           
+            end
+            LSEP=figure
+            semilogy(MinDrop:MaxDrop,LSEU*100,"b-s","LineWidth",2);
+            CNTER=1;
+            for i=MinDrop:MaxDrop
+                text(i,LSEU(CNTER)*2*100,string(NM(i)),"FontSize",12,"Color","r")
+                text(i,LSEU(CNTER)*3*100,string(SingleBlockNM(i)),"FontSize",12,"Color","b")
+                text(i,LSEU(CNTER)*4*100,string(sprintf('%.4e ',CompTime(i)))+"s","FontSize",12,"Color","b");
+                text(i,LSEU(CNTER)*6*100,string(sprintf('%.3e ',TotalTime(i)))+"s","FontSize",12,"Color","r")
+                CNTER=CNTER+1;
+            end
+            ax=gca;
+            axis([MinDrop,MaxDrop+1,min(LSEU*100/2),max(LSEU*100*4)]);
+            xlabel("Eigenvalue Order Drop","FontSize",12);
+            ylabel("LSE (%) for Potential");
+            savefig(LSEP,"./Results/LSEPotential");
+            LSEMl=figure
+            semilogy(MinDrop:MaxDrop,LSEUM*100,"b-s","LineWidth",2);
+            axis([MinDrop,MaxDrop+1,min(LSEUM*100/2),max(LSEUM*100*4)]);
+            xlabel("Eigenvalue Order Drop","FontSize",12);
+            ylabel("LSE Middle(%) for Potential");
+            savefig(LSEMl,"./Results/LSEPotentialM");
+        elseif(PM=="Normal")
+            [~,~,~,CompTime,TotalTime]=obj.DataM.compLSEU(0,0,PM,MSize);
+            obj.DataM.AssembleTimes=obj.times;
+            fileID = fopen('./Results/NormalUTimes.txt','w');
+            fprintf(fileID,"Direct Computation Time per block is is: %f\n",CompTime);
+            fprintf(fileID,"TotalTime is: %f\n",TotalTime);
+            fclose(fileID);
+        end
+       obj.DataM.PlotPP(Drop,NFM,PS,DoM,UMU)
+ elseif(DoM=='C')
+if(PM=="Classical")
+            LSEU=zeros(length(1:UMU),1);
+            LSEUM=zeros(length(1:UMU),1);
+            NM=zeros(length(1:UMU),1);
+            SingleBlockNM=zeros(length(1:UMU),1);
+            CompTime=zeros(length(1:UMU),1);
+            TotalTime=zeros(length(1:UMU),1);
+            CNTER=1;
+            for i=1:UMU
+                [LSEU(CNTER),NM(CNTER),SingleBlockNM(CNTER),CompTime(CNTER),TotalTime(CNTER),LSEUM(CNTER)]=obj.DataM.compLSEU(10^(-i),0,PM,MSize,nB,DoM,i);
+                CNTER=CNTER+1;
+           
+            end
+            LSEP=figure
+            semilogy(1:UMU,LSEU*100,"b-s","LineWidth",2);
+            CNTER=1;
+            for i=1:UMU
+                text(i,LSEU(CNTER)*2*100,string(NM(i)),"FontSize",12,"Color","r")
+                text(i,LSEU(CNTER)*3*100,string(SingleBlockNM(i)),"FontSize",12,"Color","b")
+                text(i,LSEU(CNTER)*4*100,string(sprintf('%.3e ',CompTime(i)))+"s","FontSize",12,"Color","b")
+                text(i,LSEU(CNTER)*6*100,string(sprintf('%.3e ',TotalTime(i)))+"s","FontSize",12,"Color","r")
+                CNTER=CNTER+1;
+            end
+            ax=gca;
+            axis([1,UMU+1,min(LSEU*100/2),max(LSEU*100*4)]);
+            xlabel("Number of U Modes","FontSize",12);
+            ylabel("LSE (%) for Potential");
+            savefig(LSEP,"./Results/LSEPotential");
+            LSEMl=figure
+            semilogy(1:UMU,LSEUM*100,"b-s","LineWidth",2);
+            axis([1,UMU+1,min(LSEUM*100/2),max(LSEUM*100*4)]);
+            xlabel("Number of U Modes","FontSize",12);
+            ylabel("LSE Middle (%) for Potential");
+            savefig(LSEMl,"./Results/LSEPotentialM");
+        elseif(PM=="Fourier")
+            LSEU=zeros(length(1:NFML),1);
+            LSEUM=zeros(length(1:NFML),1);
+            NM=zeros(length(1:NFML),1);
+            SingleBlockNM=zeros(length(1:NFML),1);
+            CompTime=zeros(length(1:NFML),1);
+            TotalTime=zeros(length(1:NFML),1);
+            CNTER=1;
+            for i=1:NFML
+                [LSEU(CNTER),NM(CNTER),SingleBlockNM(CNTER),CompTime(CNTER),TotalTime(CNTER),LSEUM(CNTER)]=obj.DataM.compLSEU(0,i,PM,MSize,nB,DoM,UMU);
+                CNTER=CNTER+1;
+           
+            end
+            LSEP=figure
+            semilogy(1:NFML,LSEU*100,"b-s","LineWidth",2);
+            CNTER=1;
+            for i=1:NFML
+                text(i,LSEU(CNTER)*2*100,string(NM(i)),"FontSize",12,"Color","r")
+                text(i,LSEU(CNTER)*3*100,string(SingleBlockNM(i)),"FontSize",12,"Color","b")
+                text(i,LSEU(CNTER)*4*100,string(sprintf('%.4e ',CompTime(i)))+"s","FontSize",12,"Color","b")
+                text(i,LSEU(CNTER)*6*100,string(sprintf('%.3e ',TotalTime(i)))+"s","FontSize",12,"Color","r")
+                CNTER=CNTER+1;
+            end
+            axis([1,NFML+1,min(LSEU*100/2),max(LSEU*100*4)]);
+            xlabel("NFM used","FontSize",12);
+            ylabel("LSE (%) for Potential");
+            savefig(LSEP,"./Results/LSEPotential");
+            LSEMl=figure
+            semilogy(1:NFML,LSEUM*100,"b-s","LineWidth",2);
+            axis([1,NFML+1,min(LSEUM*100/2),max(LSEUM*100*4)]);
+            xlabel("NFM used","FontSize",12);
+            ylabel("LSE Middle (%) for Potential");
+            savefig(LSEMl,"./Results/LSEPotentialM");
+        elseif(PM=="PSinv")
+            LSEU=zeros(length(1:UMU),1);
+            LSEUM=zeros(length(1:UMU),1);
+            NM=zeros(length(1:UMU),1);
+            SingleBlockNM=zeros(length(1:UMU),1);
+            CompTime=zeros(length(1:UMU),1);
+            TotalTime=zeros(length(1:UMU),1);
+            CNTER=1;
+            for i=1:UMU
+                [LSEU(CNTER),NM(CNTER),SingleBlockNM(CNTER),CompTime(CNTER),TotalTime(CNTER),LSEUM(CNTER)]=obj.DataM.compLSEU(10^(-i),0,PM,MSize,nB,DoM,i);
+                CNTER=CNTER+1;
+           
+            end
+            LSEP=figure
+            semilogy(1:UMU,LSEU*100,"b-s","LineWidth",2);
+            CNTER=1;
+            for i=1:UMU
+                text(i,LSEU(CNTER)*2*100,string(NM(i)),"FontSize",12,"Color","r")
+                text(i,LSEU(CNTER)*3*100,string(SingleBlockNM(i)),"FontSize",12,"Color","b")
+                text(i,LSEU(CNTER)*4*100,string(sprintf('%.4e ',CompTime(i)))+"s","FontSize",12,"Color","b");
+                text(i,LSEU(CNTER)*6*100,string(sprintf('%.3e ',TotalTime(i)))+"s","FontSize",12,"Color","r")
+                CNTER=CNTER+1;
+            end
+            ax=gca;
+            axis([1,UMU+1,min(LSEU*100/2),max(LSEU*100*4)]);
+            xlabel("Number of U Modes","FontSize",12);
+            ylabel("LSE (%) for Potential");
+            savefig(LSEP,"./Results/LSEPotential");
+            LSEMl=figure
+            semilogy(1:UMU,LSEUM*100,"b-s","LineWidth",2);
+            axis([1,UMU+1,min(LSEUM*100/2),max(LSEUM*100*4)]);
+            xlabel("Number of U Modes","FontSize",12);
+            ylabel("LSE Middle(%) for Potential");
+            savefig(LSEMl,"./Results/LSEPotentialM");
+        elseif(PM=="Normal")
+            [~,~,~,CompTime,TotalTime]=obj.DataM.compLSEU(0,0,PM,MSize,DoM,UMU);
+            obj.DataM.AssembleTimes=obj.times;
+            fileID = fopen('./Results/NormalUTimes.txt','w');
+            fprintf(fileID,"Direct Computation Time per block is is: %f\n",CompTime);
+            fprintf(fileID,"TotalTime is: %f\n",TotalTime);
+            fclose(fileID);
+        end
+       obj.DataM.PlotPP(Drop,NFM,PS,DoM,UMU)
+
+ end
+       
+
+       
+       
+end
+ % function [NUMModes,WFPOD]=assemble(obj,m,s)
+ % 
+ %                WFPOD=zeros(size(obj.DataM.TX,1),size(obj.DataM.TX,2));
+ %                NUMModes=0;
+ %                 for i=1:obj.DataM.Trows
+ % 
+ %                        sy=(i-1)*obj.DataM.n-(i-2);
+ %                        ey=i*obj.DataM.n-(i-1);
+ %                        for j=1:obj.DataM.Tcols
+ %                              sx=(j-1)*obj.DataM.n-(j-2);
+ %                              ex=j*obj.DataM.n-(j-1);
+ %                              if(length(obj.DataM.asplit{i,j,s}(:))<1)
+ %                                  continue;
+ %                              else
+ %                                      if (m==1||length(obj.DataM.asplit{i,j,s}(:))==1)
+ %                                            WFPOD(sy:ey,sx:ex)=obj.DataM.asplit{i,j,s}(1)*obj.DataM.Structure{i,j}.Modes(:,:,obj.DataM.ModesI{i,j,s}(1));
+ %                                            NUMModes=NUMModes+1;
+ %                                      else
+ %                                           if(m>length(obj.DataM.asplit{i,j,s}(:)))
+ %                                                newm=length(obj.DataM.asplit{i,j,s}(:));
+ %                                                WFPOD(sy:ey,sx:ex)=einsum(obj.DataM.Structure{i,j}.Modes(:,:,obj.DataM.ModesI{i,j,s}(1:newm)),obj.DataM.asplit{i,j,s}(1:newm),'ijk,kc->ijc');
+ %                                                NUMModes=NUMModes+newm;
+ %                                           else
+ %                                               WFPOD(sy:ey,sx:ex)=einsum(obj.DataM.Structure{i,j}.Modes(:,:,obj.DataM.ModesI{i,j,s}(1:m)),obj.DataM.asplit{i,j,s}(1:m),'ijk,kc->ijc');
+ %                                               NUMModes=NUMModes+m;
+ %                                           end
+ %                                      end
+ %                             end
+ %                        end
+ %                 end
+ %        end
+
+        function [NUMModes,WFPOD]=assemble(obj,m,s)
+
+                WFPOD=zeros(size(obj.DataM.TX,1),size(obj.DataM.TX,2));
+                NUMModes=0;
+                n=obj.DataM.n;
+                 for i=1:obj.DataM.Trows
+
+                        sy=(i-1)*obj.DataM.n-(i-2);
+                        ey=i*obj.DataM.n-(i-1);
+                        for j=1:obj.DataM.Tcols
+                              sx=(j-1)*obj.DataM.n-(j-2);
+                              ex=j*obj.DataM.n-(j-1);
+                              if(length(obj.DataM.asplit{i,j,s}(:))<1)
+                                  continue;
+                              else
+                                      if (m==1||length(obj.DataM.asplit{i,j,s}(:))==1)
+                                            WFPOD(sy:ey,sx:ex)=reshape(obj.DataM.asplit{i,j,s}(1)*obj.DataM.Structure{i,j}.ModesMult(:,obj.DataM.ModesI{i,j,s}(1)),n,n);
+                                            NUMModes=NUMModes+1;
+                                      else
+                                           if(m>length(obj.DataM.asplit{i,j,s}(:)))
+
+                                                newm=length(obj.DataM.asplit{i,j,s}(:));
+                                                WFPOD(sy:ey,sx:ex)=reshape(obj.DataM.Structure{i,j}.ModesMult(:,obj.DataM.ModesI{i,j,s}(1:newm))*obj.DataM.asplit{i,j,s}(1:newm),n,n);
+                                                NUMModes=NUMModes+newm;
+                                           else
+                                               WFPOD(sy:ey,sx:ex)=reshape(obj.DataM.Structure{i,j}.ModesMult(:,obj.DataM.ModesI{i,j,s}(1:m))*obj.DataM.asplit{i,j,s}(1:m),n,n);
+                                               NUMModes=NUMModes+m;
+                                           end
+                                      end
+                             end
+                        end
+                 end
+        end
+
+
+
+    end
+end
+
