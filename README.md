@@ -35,4 +35,6 @@ To verify the model using the same nanostructure you have previously used for ve
 
 [2] Veresko, M., & Cheng, M.-C. (2023). Quantum element method for multi-dimensional nanostructures enabled by a projection-based learning algorithm. Solid-State Electronics, 202, 108610. https://doi.org/10.1016/j.sse.2023.108610
 
-[3] Veresko, M., Liu, Y., Hou, D., & Cheng, M.-C. (2025). Physics-Aware POD-Based Learning for Ab initio QEM-Galerkin Simulations of Periodic Nanostructures (Version 1). arXiv. https://doi.org/10.48550/ARXIV.2501.09089
+[3] Martin Veresko, Yu Liu, Daqing Hour, Ming-Cheng Cheng, “Physics-Aware POD-Based Learning for Ab initio QEM-Galerkin Simulations of Periodic Nanostructures”, Computer Physics Communications, 315, 109718, 2025. 
+
+Paper link: https://kwnsfk27.r.eu-west-1.awstrack.me/L0/https:%2F%2Fauthors.elsevier.com%2Fa%2F1lHjN2OInvc-U/1/0102019781fbead7-cd2ef05c-9117-41d5-b802-b5d1586b0413-000000/dGnQOd62KLJE_tZf0dgekDHVKZc=431
