@@ -444,10 +444,10 @@ function []=UprepFFT(obj,NFML,FMM)
       y=linspace(0,obj.H,obj.n);
       [X,Y]=meshgrid(x,y);
       n=obj.n; ;W=obj.W; H=obj.H;
-     if(mod(n,2)==0) % even split
-        dk=[-n/2:1:1:n/2-1]; c=n/2+1; % <-- using n
+    if(mod(n,2)==0) % even split
+        dk=[-round(n/2):1:1:round(n/2)-1]; c=n/2+1; % <-- using n
      else %odd split
-        dk=[-(n-1)/2:1:(n-1)/2]; c=n/2; % <-- using n
+        dk=[-round((n-1)/2):1:round((n-1)/2)]; c=n/2; % <-- using n
      end
      if(mod(NFML,2)==0) % even split
         dkN=[-NFML/2:1:1:NFML/2-1]; % <-- using n
